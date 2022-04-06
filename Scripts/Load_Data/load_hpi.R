@@ -2,7 +2,7 @@
 ## PBH April 2022
 
 # Common functions and parameters
-source("Scripts/00-Common.R", encoding = "UTF-8")
+# source("Scripts/00-Common.R", encoding = "UTF-8")
 
 # load data --------
 hpi <- read_delim(sprintf(url_file,"HPI/hpi.csv"),
@@ -26,4 +26,20 @@ hpi <- hpi[,c(col_location,col_indexScore,col_health,
 
 rm(col_location,col_indexScore,col_health,
    col_exposure,col_protection)
+
+# hpi_metadata
+hpi_metadata <- read_excel(sprintf(url_file,"HPI/hpi_metadata.xlsx"),
+                  sheet="hpi_metadata")
+
+# description for HPI
+f.getDescHPI <- function(var){
+  hpi_metadata %>% filter(variable==var) %>% pull(shorttitle)
+}
+
+# definition for HPI
+f.getDefinitionHPI <- function(var){
+  hpi_metadata %>% filter(variable==var) %>% pull(definition)
+}
+
+
 ## EoF
