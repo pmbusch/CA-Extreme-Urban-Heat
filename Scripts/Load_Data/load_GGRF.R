@@ -21,7 +21,9 @@ col_temporal <- c("DateOperational","ProjectCompletionDate",
 col_spatial <- c("CensusTract","Address","Lat","Long")
 col_funds <- c("TotalProjectCost","TotalProgramGGRFFunding")
 col_implementation <- c("EstimatedNumberOfTreesToBePlanted",
-                        "ProjectAcreage")
+                        "ProjectAcreage",
+                        "DisadvantagedCommunityBenefitsDescription",
+                        "OtherProjectBenefitsDescription")
 col_benefits <- c("EstimatedEnergySavedKWH","EstimatedAcresPreserved",
                   "EstimatedAcresRestored","EstimatedAcresTreated")
 col_EJ <- c("IsBenefitDisadvantagedCommunities",
@@ -64,6 +66,8 @@ ggrf <- ggrf %>%
     FiscalYearFundingProject=min(FiscalYearFundingProject),
     TotalProjectCost=sum(TotalProjectCost,na.rm=T),
     TotalProgramGGRFFunding=sum(TotalProgramGGRFFunding,na.rm=T),
+    DisadvantagedCommunityBenefitsDescription=paste0(DisadvantagedCommunityBenefitsDescription,collapse="; "),
+    OtherProjectBenefitsDescription=paste0(OtherProjectBenefitsDescription,collapse = "; "),
     IsBenefitDisadvantagedCommunities=max(IsBenefitDisadvantagedCommunities),
     EstimatedNumberOfTreesToBePlanted=sum(EstimatedNumberOfTreesToBePlanted,na.rm=T),
     ProjectAcreage=sum(ProjectAcreage,na.rm=T),

@@ -6,10 +6,6 @@ source("Scripts/Load_Data/load_GGRF.R", encoding = "UTF-8")
 source("Scripts/Load_Data/load_hpi.R", encoding = "UTF-8")
 source("Scripts/Load_Data/load_zip.R", encoding = "UTF-8")
 
-# grantee
-table(ggrf$FundingRecipient) %>% sort()
-
-hpi$zip
 
 ## Data wrangling -------------
 
@@ -17,8 +13,70 @@ hpi$zip
 ggrf$zip <- NULL
 ggrf <- ggrf %>% left_join(zip_dict,by=c("ProjectIDNumber"))
 
+## TABLES  ------------
+
+## unique projects
+ggrf %>% group_by(ProgramName) %>% tally()
+# funds
+ggrf %>% group_by(ProgramName) %>% 
+  summarise(TotalProjectCost_MM=sum(TotalProjectCost)/1e6)
+# funds for DAC
+ggrf %>% group_by(ProgramName) %>% 
+  summarise(TotalGGRFDisadvantagedCommunityFunding_MM=
+              sum(TotalGGRFDisadvantagedCommunityFunding)/1e6)
+# tree planted
+ggrf %>% group_by(ProgramName) %>% 
+  summarise(EstimatedNumberOfTreesToBePlanted=sum(EstimatedNumberOfTreesToBePlanted))
+# % of projects that planted trees
+ggrf %>% group_by(ProgramName) %>% 
+  summarise(sum(EstimatedNumberOfTreesToBePlanted>0)/n()*100)
+# avg project area
+ggrf %>% group_by(ProgramName) %>% 
+  summarise(ProjectAcreage=mean(ProjectAcreage))
+# different grantees
+ggrf %>% group_by(ProgramName) %>% 
+  summarise(count=n_distinct(FundingRecipient))
+# life years of projects (freq)
+ggrf %>% group_by(ProgramName, ProjectLifeYears) %>% tally()
+
+# mentions urban heat island in benefits
+string_UHI <- c("urban heat|urban heat island|extreme heat")
+# note: urban heat island brings all the results
+ggrf <- ggrf %>% 
+  mutate(UHI_benefit=DisadvantagedCommunityBenefitsDescription %>% 
+           str_to_lower() %>% 
+           str_detect(string_UHI),
+         UHI_otherBenefit=OtherProjectBenefitsDescription %>% 
+           str_to_lower() %>% 
+           str_detect(string_UHI),
+         both=UHI_benefit*UHI_otherBenefit,
+         any=UHI_benefit|UHI_otherBenefit)
+# % of projects that mention UHI
+ggrf %>% group_by(ProgramName) %>% 
+  summarise(UHI_benefit=sum(UHI_benefit)/n()*100,
+            UHI_otherBenefit=sum(UHI_otherBenefit)/n()*100,
+            both=sum(both)/n()*100,
+            any=sum(any)/n()*100)
+# interaction between trees and urban heat island
+sum(ggrf$any)
+table(ggrf$any, ggrf$EstimatedNumberOfTreesToBePlanted>0)
+
+# grantee
+table(ggrf$FundingRecipient) %>% sort()
+
 
 # FIGURES  ----
+
+# exploratory - funds vs tree planted
+ggrf %>% 
+  mutate(TotalProjectCost=TotalProjectCost/1e3) %>% 
+  ggplot(aes(EstimatedNumberOfTreesToBePlanted,TotalProjectCost,
+                col=ProgramName)) +
+  geom_point()+
+  facet_wrap(~ProgramName,scales="free")+
+  labs(x="Estimated # of Tree planted",y="Total project cost [thousands $USD]")+
+  theme(legend.position = "none")
+
 
 ## CalEnviroScreen vs Funds (at zip level) -----
 
@@ -38,12 +96,15 @@ ggrf_score <- ggrf %>%
 # Scatter
 ggplot(ggrf_score,aes(ces30score,TotalProjectCost,col=ProgramName))+
   geom_point(size=2,alpha=.5)+
+  facet_wrap(~ProgramName,scales ="free_y")+
   scale_y_continuous(labels=function(x) format(x, 
                                                big.mark = " ", scientific = FALSE))+
   xlim(0,100)+
   coord_cartesian(expand=T)+
   labs(x="CalEnviroScreen 3.0 Score (Zip level)",
-       y="Total project cost [thousands $USD]")
+       y="Total project cost [thousands $USD]",
+       caption="Note: Project cost range (Y-axis) has different scales.")+
+  theme(legend.position = "none")
 
 # boxplot
 ggrf_score %>% 
@@ -83,8 +144,9 @@ f.scatter.funds <- function(var){
            ProgramName=str_replace_all(ProgramName,
                                        "Forestry",
                                        "\n Forestry"))
-  # get title from dictionary
+  # get title and def. from dictionary
   title <- f.getDescHPI(deparse(substitute(var)))
+  definition <- f.getDefinitionHPI(deparse(substitute(var)))
   
   # Scatter
   ggplot(ggrf_score,aes(var_int,TotalProjectCost,col=ProgramName))+
@@ -95,7 +157,8 @@ f.scatter.funds <- function(var){
                                                  scientific = FALSE))+
     coord_cartesian(expand=T)+
     labs(x=paste0(title," (ZIP Level)"),
-         y="Total project cost [thousands $USD]")+
+         y="Total project cost [thousands $USD]",
+         caption=definition)+
     ggtitle(title)
 }
 
@@ -120,5 +183,6 @@ f.scatter.funds(treecanopy)
 f.scatter.funds(impervsurf_pct)
 f.scatter.funds(parkaccess)
 dev.off()
+
 
 ## EoF
