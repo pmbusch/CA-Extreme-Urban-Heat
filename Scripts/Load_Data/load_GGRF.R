@@ -89,7 +89,16 @@ sum(!is.na(ggrf$zip))/nrow(ggrf)*100
 
 table(ggrf$ProgramName)
 
+## load other Databases ------
+source("Scripts/Load_Data/load_zip.R", encoding = "UTF-8")
+source("Scripts/Load_Data/load_hpi.R", encoding = "UTF-8")
 
+
+## Data wrangling -------------
+
+# add zip code to GGRF
+ggrf$zip <- NULL
+ggrf <- ggrf %>% left_join(zip_dict,by=c("ProjectIDNumber"))
 
 
 ## EoF
