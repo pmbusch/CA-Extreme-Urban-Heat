@@ -1,71 +1,30 @@
 ## Analysis on GGFR Projects
 ## PBH April 2022
 
+# LOAD DATA
 source("Scripts/00-Common.R", encoding = "UTF-8")
-source("Scripts/Load_Data/load_GGRF.R", encoding = "UTF-8")
+source("Scripts/Load_Data/load_hpi.R", encoding = "UTF-8")
+ggrf <- read_rds("Data/ggrf_zip.rds")
 library(spatstat)
 
-
-# TABLES  ------------
-
-## Table Summary of Project data -----
-
-## unique projects
-ggrf %>% group_by(ProgramName) %>% tally()
-# funds
-ggrf %>% group_by(ProgramName) %>% 
-  summarise(TotalProjectCost_MM=sum(TotalProjectCost)/1e6)
-# funds for DAC
-ggrf %>% group_by(ProgramName) %>% 
-  summarise(TotalGGRFDisadvantagedCommunityFunding_MM=
-              sum(TotalGGRFDisadvantagedCommunityFunding)/1e6)
-# tree planted
-ggrf %>% group_by(ProgramName) %>% 
-  summarise(EstimatedNumberOfTreesToBePlanted=sum(EstimatedNumberOfTreesToBePlanted))
-# % of projects that planted trees
-ggrf %>% group_by(ProgramName) %>% 
-  summarise(sum(EstimatedNumberOfTreesToBePlanted>0)/n()*100)
-# avg project area
-ggrf %>% group_by(ProgramName) %>% 
-  summarise(ProjectAcreage=mean(ProjectAcreage))
-# different grantees
-ggrf %>% group_by(ProgramName) %>% 
-  summarise(count=n_distinct(FundingRecipient))
-# life years of projects (freq)
-ggrf %>% group_by(ProgramName, ProjectLifeYears) %>% tally()
-
-# mentions urban heat island in benefits
-string_UHI <- c("urban heat|urban heat island|extreme heat")
-# note: urban heat island brings all the results
-ggrf <- ggrf %>% 
-  mutate(UHI_benefit=DisadvantagedCommunityBenefitsDescription %>% 
-           str_to_lower() %>% 
-           str_detect(string_UHI),
-         UHI_otherBenefit=OtherProjectBenefitsDescription %>% 
-           str_to_lower() %>% 
-           str_detect(string_UHI),
-         both=UHI_benefit*UHI_otherBenefit,
-         any=UHI_benefit|UHI_otherBenefit)
-# % of projects that mention UHI
-ggrf %>% group_by(ProgramName) %>% 
-  summarise(UHI_benefit=sum(UHI_benefit)/n()*100,
-            UHI_otherBenefit=sum(UHI_otherBenefit)/n()*100,
-            both=sum(both)/n()*100,
-            any=sum(any)/n()*100)
-# interaction between trees and urban heat island
-sum(ggrf$any)
-table(ggrf$any, ggrf$EstimatedNumberOfTreesToBePlanted>0)
-
-# grantee
-table(ggrf$FundingRecipient) %>% sort()
-
 ## Table 2 Comparison of conditions to CA -----
-# see script ggrf_hpi for a comparison made base on each "tree" planted by each 
-# project (as oppose to a unique project location)
+# EACH POINT REPRESENTS SOMETHING IMPLEMENTED BY THE PROJECT, like a tree or park
+# This method gives greater weight to projects with more trees planted (or other)
 
+ggrf <- ggrf %>% rename(zip=ZIP_CODE,
+                        ProgramName=subprogram_name)
+names(ggrf)
+
+# remove spatial dependency (less memory)
+ggrf$Shape <- NULL
+class(ggrf)
+
+table(ggrf$ProgramName)
+table(ggrf$zip)
 # number of distinct ZIP codes
-ggrf %>% group_by(ProgramName) %>% 
-  summarise(n=n_distinct(zip))
+# ggrf %>% group_by(ProgramName) %>% 
+#   summarise(n=n_distinct(zip))
+
 hpi %>% 
   filter(str_length(zip)==5) %>% 
   pull(zip) %>% unique() %>% length()
@@ -84,7 +43,9 @@ hpi_zip <- hpi %>%
   summarise(across(-pop2010,
                    list(mean=~weighted.mean(.,w=pop2010,na.rm=T))),
             .groups = 'drop')
+
 names(hpi_zip) <- names(hpi_zip) %>% str_remove("_mean")
+
 # add total population for each zip code
 zip_pop <- hpi %>% 
   group_by(zip) %>% 
@@ -151,14 +112,42 @@ scores$variable <- NULL
 # number of agg function
 number_agg <- scores$metric %>% unique() %>% length()
 
+## add clasification of categories
+scores <- scores %>% 
+  mutate(Category=case_when(
+    Metric %in% c("CalEnviroScreen 3.0 Score",
+                  "HPI Score",
+                  "Urban Heat Island Index") ~ "Index Score",
+    Metric %in% c("Life Expectancy at Birth",
+                  "Elderly") ~ "Vulnerability",
+    Metric %in% c("Outdoor Workers",
+                  "Extreme Heat Days") ~ "Exposure",
+    Metric %in% c("Air Conditioning",
+                  "Tree Canopy",
+                  "Impervious Surface Cover",
+                  "Park Access") ~ "Protection"))
+                    
 # final table with median or mean
 scores %>% 
+  relocate(Category) %>% 
   filter(metric %in% c("mean")) %>% select(-metric) %>%
   pivot_wider(names_from = ProgramName, values_from = value) %>% 
   flextable() %>% autofit() %>% 
-  colformat_double(j=3:5,digits=2) %>% 
-  colformat_double(i=3,j=3:5,digits=0)
+  colformat_double(j=4:6,digits=2) %>% 
+  colformat_double(i=3,j=4:6,digits=0) %>% 
+  merge_v(j=1) %>% 
+  hline(i=c(3,5,7,11)) %>% 
+  # highlight rows with undesirable outcomes
+  bold(i=c(3,5,7,11),j=5) %>% 
+  bold(i=c(3,5,8,11),j=6) %>% 
+  footnote(part="header",j=c(4,5,6),
+           value = as_paragraph(c(
+             "Highlighted are values in with an unwanted difference and direction with respect to CA average",
+             "Data from 81,332 locations where project was implemented",
+             "Data from 4,564 locations where project was implemented"
+             ))) 
 
+table(ggrf_hpi$ProgramName)
 
 # final table with all aggregate function: meadin, avg, p95
 scores %>% 

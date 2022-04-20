@@ -9,6 +9,19 @@
 ggrf <- read_excel(sprintf(url_file,"../GGFR Project Analysis.xlsx"),
                   sheet = "Implemented Projects")
 
+nrow(ggrf)
+ggrf$Lat %>% unique %>% length()
+ggrf$ProjectIDNumber %>% unique %>% length()
+
+
+ggrf %>% group_by(ProjectIDNumber,Lat) %>% tally()
+
+
+ggrf %>% filter(!is.na(Lat)) %>% 
+  pull(ProjectIDNumber) %>% unique() %>% length()
+  
+
+
 names(ggrf) <- names(ggrf) %>% str_replace_all(" ","_")
 
 # columns of interest
