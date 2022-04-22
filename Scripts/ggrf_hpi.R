@@ -146,6 +146,8 @@ scores %>%
              "Data from 81,332 locations where project was implemented",
              "Data from 4,564 locations where project was implemented"
              ))) 
+  # print(preview="docx")
+
 
 table(ggrf_hpi$ProgramName)
 

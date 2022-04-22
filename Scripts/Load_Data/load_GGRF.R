@@ -1,6 +1,6 @@
 ## Load and Clean GGRF Projects Data
 ## PBH April 2022
-
+## Source: https://webmaps.arb.ca.gov/ccimap/
 
 # Common functions and parameters
 # source("Scripts/00-Common.R", encoding = "UTF-8")
