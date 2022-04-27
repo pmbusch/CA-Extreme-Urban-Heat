@@ -42,7 +42,7 @@ ggrf <- ggrf %>%
            str_to_lower() %>% 
            str_detect(string_UHI),
          UHI_otherBenefit=OtherProjectBenefitsDescription %>% 
-           str_to_lower() %>% 
+           OtherProjectBenefitsDescription %>% 
            str_detect(string_UHI),
          both=UHI_benefit*UHI_otherBenefit,
          any=UHI_benefit|UHI_otherBenefit)

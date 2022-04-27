@@ -13,7 +13,8 @@ hpi <- read_delim(sprintf(url_file,"HPI/hpi.csv"),
 col_location <- c("city","county_name",
                   "geoid","zip")
 col_indexScore <- c("ces30score",
-                    "hpi2score","uhii")
+                    "hpi2score","hpi2_pctile",
+                    "uhii")
 col_health <- c("bphigh_pct","chd_pct",
                "leb_pct","heartattack")
 col_exposure <- c("pop2010","elders_pct",

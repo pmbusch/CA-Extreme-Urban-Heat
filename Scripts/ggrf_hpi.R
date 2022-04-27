@@ -4,13 +4,35 @@
 # LOAD DATA
 source("Scripts/00-Common.R", encoding = "UTF-8")
 source("Scripts/Load_Data/load_hpi.R", encoding = "UTF-8")
-ggrf <- read_rds("Data/ggrf_zip.rds")
+source("Scripts/Load_Data/load_GGRF.R", encoding = "UTF-8")
+ggrf_zip <- read_rds("Data/ggrf_zip.rds")
 library(spatstat)
 
 ## Table 2 Comparison of conditions to CA -----
+
+# add some project info to ggrf_zip
+# ggrf$ProjectIDNumber %>% str_length() %>% unique()
+# ggrf_zip$proj_id %>% str_length() %>% unique()
+
+
+# OPTIONAL: Filter GGRF by projects that mention "Urban Heat"
+# ggrf <- ggrf_zip %>% 
+#   left_join(ggrf,by=c("proj_id"="ProjectIDNumber"))
+# string_UHI <- c("urban heat|urban heat island|extreme heat")
+# ggrf <- ggrf %>% 
+#   mutate(string_aux=paste0(DisadvantagedCommunityBenefitsDescription, #combine both description to filter
+#                            OtherProjectBenefitsDescription) %>% 
+#            str_to_lower()) %>% 
+#   filter(str_detect(string_aux,string_UHI))
+
+# OPTIONAL: Filter to know if trees are included
+# ggrf <- ggrf %>% 
+#   filter(EstimatedNumberOfTreesToBePlanted>0)
+
 # EACH POINT REPRESENTS SOMETHING IMPLEMENTED BY THE PROJECT, like a tree or park
 # This method gives greater weight to projects with more trees planted (or other)
 
+ggrf <- ggrf_zip
 ggrf <- ggrf %>% rename(zip=ZIP_CODE,
                         ProgramName=subprogram_name)
 names(ggrf)
@@ -31,7 +53,10 @@ hpi %>%
 
 # select relevant variables to include in the summary
 # names(hpi)
-comp_var <- c("ces30score","hpi2score","uhii",
+comp_var <- c("ces30score",
+              # "hpi2score",
+              "hpi2_pctile", #percentile of HPI
+              "uhii",
               "leb_pct","elders_pct","outdoors_pct",
               "heatdays","aircon_pct","treecanopy","impervsurf_pct","parkaccess")
 
@@ -109,14 +134,40 @@ scores$Metric <- sapply(scores$variable,f.getDescHPI)
 scores$Description <- sapply(scores$variable,f.getDefinitionHPI)
 scores$variable <- NULL
 
-# number of agg function
-number_agg <- scores$metric %>% unique() %>% length()
+
+# change description and value of Urban Heat Island Index
+scores <- scores %>% 
+  mutate(Description=if_else(Metric=="Urban Heat Island Index",
+                              "Temperature degree difference (hourly avg.) between urban and rural reference",
+                              Description),
+          value=if_else(Metric=="Urban Heat Island Index",
+                       value/182/24, # 182 days with 24 hours
+                       value))
+
+# change scores description
+scores <- scores %>% 
+  mutate(Description=if_else(Metric=="CalEnviroScreen 3.0 Score",
+                             "Measures the pollution and vulnerability of population. Higher score is worse",
+                             Description),
+         Description=if_else(Metric=="Healthy Places Index (HPI) Score percentile",
+                             "Combination of community characteristics that improve health. Higher percentile is better.",
+                             Description))
+
+
+
+# change program name
+scores <- scores %>% 
+  mutate(ProgramName=case_when(
+    ProgramName=="Urban and Community Forestry" ~ "UCF",
+    ProgramName=="Urban Greening Program" ~ "UGGP",
+    T ~ ProgramName))
+
 
 ## add clasification of categories
 scores <- scores %>% 
   mutate(Category=case_when(
     Metric %in% c("CalEnviroScreen 3.0 Score",
-                  "HPI Score",
+                  "Healthy Places Index (HPI) Score percentile",
                   "Urban Heat Island Index") ~ "Index Score",
     Metric %in% c("Life Expectancy at Birth",
                   "Elderly") ~ "Vulnerability",
@@ -133,8 +184,10 @@ scores %>%
   filter(metric %in% c("mean")) %>% select(-metric) %>%
   pivot_wider(names_from = ProgramName, values_from = value) %>% 
   flextable() %>% autofit() %>% 
-  colformat_double(j=4:6,digits=2) %>% 
-  colformat_double(i=3,j=4:6,digits=0) %>% 
+  colformat_double(j=4:6,digits=1,suffix="") %>% 
+  colformat_double(i=c(5,6,8,9,10,11),j=4:6,digits=1,suffix = "%") %>% 
+  colformat_double(i=c(3),j=4:6,digits=1,suffix = "°C") %>% 
+  # colformat_double(i=3,j=4:6,digits=0) %>% 
   merge_v(j=1) %>% 
   hline(i=c(3,5,7,11)) %>% 
   # highlight rows with undesirable outcomes
@@ -142,17 +195,21 @@ scores %>%
   bold(i=c(3,5,8,11),j=6) %>% 
   footnote(part="header",j=c(4,5,6),
            value = as_paragraph(c(
-             "Highlighted are values in with an unwanted difference and direction with respect to CA average",
-             "Data from 81,332 locations where project was implemented",
-             "Data from 4,564 locations where project was implemented"
+             "California: Highlighted are values in with an unwanted difference and direction with respect to CA average",
+             "Urban Community & Forestry Program: Data from 81,332 locations where project was implemented",
+             "Urban Greening Grant Program : Data from 4,564 locations where project was implemented"
              ))) 
   # print(preview="docx")
 
 
 table(ggrf_hpi$ProgramName)
 
+# number of agg function
+number_agg <- scores$metric %>% unique() %>% length()
+
+
 # final table with all aggregate function: meadin, avg, p95
-scores %>% 
+table_full <- scores %>% 
   relocate(metric,.after=Description) %>% 
   rename(`Agg. Function`=metric) %>% 
   pivot_wider(names_from = ProgramName, values_from = value) %>% 
